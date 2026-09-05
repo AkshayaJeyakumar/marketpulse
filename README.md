@@ -1,93 +1,89 @@
 # MarketPulse
 
-"Know what changed. Know what matters."
+> **Know what changed. Know what matters.**
 
-An attention engine for market watchlists — built for Code, by Groww.
+An attention engine for market watchlists, built for **Code, by Groww**.
 
-## Repo layout
-
-```
-marketpulse/
-  backend/     Node.js + Express API, PostgreSQL schema, service skeletons
-  frontend/    React + Vite + TypeScript + Tailwind, light/dark theme system
-```
-
-## Build phases
-
-- **Phase 1 (this delivery):** Project scaffold. DB schema. Backend service
-  skeletons with mock data. Frontend shell with theme system, design tokens,
-  and the "What changed?" dashboard wired to mock data. No live market-data
-  integration yet, no auth yet.
-- **Phase 2 (next):** Real database wiring (Supabase/Postgres), auth, watchlist
-  CRUD end-to-end.
-- **Phase 3:** Market-data provider integration + caching layer.
-- **Phase 4:** Change Detection Engine + Attention Ranking Engine (real signals).
-- **Phase 5:** Explanation service (AI-assisted, optional), reliability/freshness
-  polish, deploy.
-
-See each phase's section below as it's delivered.
+MarketPulse goes beyond simply displaying a watchlist. It identifies meaningful changes since the user last checked, ranks what deserves attention, and explains why a stock was flagged.
 
 ---
 
-## Phase 1 — what was built
+## 🎯 Problem
 
-**Backend (`/backend`)**
-- Express app skeleton with health/readiness routes.
-- Service-layer folders matching the architecture doc (watchlist, market data,
-  snapshot, change detection, attention ranking, explanation, reliability) —
-  each has a working stub returning mock data so the frontend has something
-  real to call.
-- PostgreSQL schema migration (`src/db/migrations/001_init.sql`) covering
-  Users, Watchlists, Watchlist Stocks, Market Snapshots, Change Signals, Stock
-  Metadata, Market Data Cache, User Preferences.
-- `.env.example` — no secrets committed.
+Traditional watchlists tell users **what is happening now**, but they do not answer:
 
-**Frontend (`/frontend`)**
-- Vite + React + TypeScript + Tailwind.
-- Design tokens for light/dark modes (Groww-inspired, not copied — see
-  `frontend/src/styles/tokens.css`).
-- Theme context + toggle, persisted to localStorage.
-- Dashboard shell: "What changed since you last checked?" header, three
-  attention tiers (Significant / Worth Watching / Normal), a stock card with
-  freshness badge (LIVE/RECENT/DELAYED/STALE/UNAVAILABLE) and a "why flagged"
-  explanation line — all rendered from mock data in
-  `frontend/src/mocks/mockData.ts`.
-- Empty state and API-unavailable state components (shown via a toggle for
-  now, since there's no real backend call yet).
+- What changed since I last checked?
+- Which changes actually matter?
+- Why should I pay attention to this stock?
+- Is the market data fresh or delayed?
+- What other stocks might be relevant to my watchlist?
 
-## How to run Phase 1
+MarketPulse is designed to answer these questions without turning the product into a buy/sell recommendation system.
 
-**Backend**
-```bash
-cd backend
-npm install
-cp .env.example .env
-npm run dev
-# → http://localhost:4000/api/health
-```
+---
 
-**Frontend**
-```bash
-cd frontend
-npm install
-npm run dev
-# → http://localhost:5173
-```
+## 💡 Solution
 
-## What to verify in Phase 1
+MarketPulse combines:
 
-1. `GET http://localhost:4000/api/health` returns `{ status: "ok" }`.
-2. `GET http://localhost:4000/api/watchlist/mock` returns a mock watchlist
-   with attention scores and freshness metadata.
-3. Frontend loads the dashboard with three attention sections populated from
-   mock data.
-4. Theme toggle switches light ↔ dark, persists on refresh, and every surface
-   (navbar, cards, badges, buttons) restyles consistently — no unstyled
-   flashes.
-5. Resize to mobile width — layout stays usable, no horizontal scroll.
-6. Toggle the "simulate API failure" control (top right, dev-only) and
-   confirm the UI shows an honest "data unavailable" state rather than stale
-   numbers.
+- 📊 **Watchlist management**
+- 🔍 **Change detection**
+- 🧠 **Attention ranking**
+- 💬 **Explainable market signals**
+- ⚡ **Market-data freshness and reliability**
+- 👤 **User authentication**
+- 🎯 **Personalized watchlist suggestions**
+- 📈 **Stock details and historical market data**
+- 🌗 **Light and dark themes**
 
-Once you've checked these, say go and I'll move to Phase 2 (real DB + auth +
-watchlist CRUD).
+The core experience is:
+
+> **Know what changed. Know what matters.**
+
+---
+
+## ✨ Key Features
+
+### 1. Smart Watchlist
+
+Users can create and manage their personal watchlist.
+
+Stocks can be:
+
+- Added
+- Removed
+- Viewed
+- Opened for detailed analysis
+
+Watchlist data is persisted through the backend and database rather than relying only on browser state.
+
+---
+
+### 2. "What Changed?" Dashboard
+
+Instead of showing every stock with equal importance, MarketPulse organizes stocks into attention tiers:
+
+- 🔴 **Significant**
+- 🟡 **Worth Watching**
+- ⚪ **Normal**
+
+This helps reduce information overload and focuses the user's attention on meaningful changes.
+
+---
+
+### 3. Change Detection Engine
+
+MarketPulse compares market observations and identifies changes in:
+
+- Price
+- Trading volume
+- Volatility
+
+Signals are converted into an attention score using configurable weights.
+
+The current default weighting is:
+
+```text
+Price       50%
+Volume      30%
+Volatility  20%
