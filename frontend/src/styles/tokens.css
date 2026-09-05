@@ -1,0 +1,95 @@
+/*
+  MarketPulse design tokens.
+
+  Palette is inspired by modern Indian fintech (clean, trustworthy, restrained
+  green) but is an original combination, not lifted from any single product.
+
+  Light mode: cool-neutral off-white, not warm cream.
+  Dark mode: blue-tinted charcoal, not pure black.
+  Green is reserved for the primary action + positive market movement.
+  Red is reserved ONLY for negative market movement — never for UI errors,
+  which use the amber/attention scale instead (a red UI would visually
+  compete with "stock is down" signals).
+*/
+
+:root {
+  /* Base */
+  --bg: #F6F7F9;
+  --bg-elevated: #FFFFFF;
+  --bg-subtle: #EEF0F3;
+  --border: #E1E4EA;
+  --border-strong: #CDD2DB;
+
+  --text-primary: #171A21;
+  --text-secondary: #565D6C;
+  --text-tertiary: #8891A0;
+
+  /* Brand / action */
+  --brand: #17724A;
+  --brand-strong: #10593A;
+  --brand-soft: #E4F3EC;
+  --brand-on: #FFFFFF;
+
+  /* Market semantics */
+  --positive: #17724A;
+  --positive-soft: #E4F3EC;
+  --negative: #B3453A;
+  --negative-soft: #FBEAE8;
+  --attention: #C1791A;
+  --attention-soft: #FBF0DE;
+  --neutral-tier: #667085;
+  --neutral-tier-soft: #EEF0F3;
+
+  /* Freshness */
+  --fresh-live: #17724A;
+  --fresh-recent: #3A7CA5;
+  --fresh-delayed: #C1791A;
+  --fresh-stale: #B3453A;
+  --fresh-unavailable: #8891A0;
+
+  /* Elevation */
+  --shadow-card: 0 1px 2px rgba(23, 26, 33, 0.04), 0 1px 1px rgba(23, 26, 33, 0.03);
+  --shadow-card-hover: 0 4px 14px rgba(23, 26, 33, 0.08);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+
+  --font-ui: "Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+
+[data-theme="dark"] {
+  --bg: #10131A;
+  --bg-elevated: #171B24;
+  --bg-subtle: #1D222C;
+  --border: #2A2F3B;
+  --border-strong: #383F4E;
+
+  --text-primary: #EDEFF4;
+  --text-secondary: #A2A9B8;
+  --text-tertiary: #6E7585;
+
+  --brand: #2FA070;
+  --brand-strong: #3EB682;
+  --brand-soft: #16352A;
+  --brand-on: #0A1210;
+
+  --positive: #35B47E;
+  --positive-soft: #16352A;
+  --negative: #E0776C;
+  --negative-soft: #3A1E1C;
+  --attention: #E0A63D;
+  --attention-soft: #3A2E14;
+  --neutral-tier: #8891A0;
+  --neutral-tier-soft: #1D222C;
+
+  --fresh-live: #35B47E;
+  --fresh-recent: #5FA8D3;
+  --fresh-delayed: #E0A63D;
+  --fresh-stale: #E0776C;
+  --fresh-unavailable: #6E7585;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24), 0 1px 1px rgba(0, 0, 0, 0.2);
+  --shadow-card-hover: 0 8px 20px rgba(0, 0, 0, 0.36);
+}
