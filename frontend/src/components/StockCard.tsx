@@ -122,17 +122,27 @@ export function StockCard({
 
             <div className="min-w-0">
 
-              <div
-                className="font-semibold"
-                style={{
-                  color: 'var(--text-primary)',
-                  fontSize:
-                    size === 'large'
-                      ? '17px'
-                      : '15px',
-                }}
-              >
-                {item.symbol}
+              <div className="flex items-center gap-2 flex-wrap">
+
+                <div
+                  className="font-semibold"
+                  style={{
+                    color: 'var(--text-primary)',
+                    fontSize:
+                      size === 'large'
+                        ? '17px'
+                        : '15px',
+                  }}
+                >
+                  {item.symbol}
+                </div>
+
+                {item.isSilentSignal && (
+                  <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700/50 rounded-md px-2 py-0.5 text-[11px] font-semibold shrink-0 inline-flex items-center gap-1">
+                    🤫 Silent Signal
+                  </span>
+                )}
+
               </div>
 
               <div
@@ -254,46 +264,63 @@ export function StockCard({
                 </div>
               )}
 
-              {/* ================= ATTENTION ================= */}
+              {/* ================= ATTENTION & ANOMALY ================= */}
 
-              <div className="mt-4 flex items-center gap-2">
+              <div className="mt-4 flex items-center justify-between gap-2 flex-wrap">
 
-                <span
-                  className="text-[11px] font-semibold tracking-wide px-2 py-1 rounded-md"
-                  style={{
-                    color: accent,
-                    backgroundColor: 'var(--bg-subtle)',
-                  }}
-                >
-                  {TIER_LABEL[item.tier] || 'NORMAL'}
-                </span>
+                <div className="flex items-center gap-2">
 
-                <span
-                  className="text-xs"
-                  style={{
-                    color: 'var(--text-tertiary)',
-                  }}
-                >
-                  Attention {item.attentionScore}
-                </span>
+                  <span
+                    className="text-[11px] font-semibold tracking-wide px-2 py-1 rounded-md"
+                    style={{
+                      color: accent,
+                      backgroundColor: 'var(--bg-subtle)',
+                    }}
+                  >
+                    {TIER_LABEL[item.tier] || 'NORMAL'}
+                  </span>
+
+                  <span
+                    className="text-xs"
+                    style={{
+                      color: 'var(--text-tertiary)',
+                    }}
+                  >
+                    Anomaly {item.anomalyScore ?? item.attentionScore}/100
+                  </span>
+
+                </div>
+
+                {item.anomalyStatus && (
+                  <span
+                    className="text-[11px] font-medium px-2 py-0.5 rounded border"
+                    style={{
+                      borderColor: 'var(--border)',
+                      color: 'var(--text-secondary)',
+                      backgroundColor: 'var(--bg-subtle)',
+                    }}
+                  >
+                    {item.anomalyStatus}
+                  </span>
+                )}
 
               </div>
 
               {/* ================= METRICS ================= */}
 
               {size === 'large' && (
-                <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
 
                   {/* Price change */}
                   <div
-                    className="rounded-lg p-3"
+                    className="rounded-lg p-2.5"
                     style={{
                       backgroundColor: 'var(--bg-subtle)',
                     }}
                   >
 
                     <div
-                      className="text-[11px]"
+                      className="text-[10px] uppercase font-medium truncate"
                       style={{
                         color: 'var(--text-tertiary)',
                       }}
@@ -302,7 +329,7 @@ export function StockCard({
                     </div>
 
                     <div
-                      className="mt-1 text-sm font-medium tabular-nums"
+                      className="mt-0.5 text-xs font-semibold tabular-nums truncate"
                       style={{
                         color:
                           priceSinceLastView === null
@@ -320,14 +347,14 @@ export function StockCard({
 
                   {/* Volume change */}
                   <div
-                    className="rounded-lg p-3"
+                    className="rounded-lg p-2.5"
                     style={{
                       backgroundColor: 'var(--bg-subtle)',
                     }}
                   >
 
                     <div
-                      className="text-[11px]"
+                      className="text-[10px] uppercase font-medium truncate"
                       style={{
                         color: 'var(--text-tertiary)',
                       }}
@@ -336,7 +363,7 @@ export function StockCard({
                     </div>
 
                     <div
-                      className="mt-1 text-sm font-medium tabular-nums"
+                      className="mt-0.5 text-xs font-semibold tabular-nums truncate"
                       style={{
                         color:
                           volumeSinceLastView === null
@@ -346,6 +373,64 @@ export function StockCard({
                       }}
                     >
                       {volumeSinceLastView || '—'}
+                    </div>
+
+                  </div>
+
+                  {/* Volume Ratio */}
+                  <div
+                    className="rounded-lg p-2.5"
+                    style={{
+                      backgroundColor: 'var(--bg-subtle)',
+                    }}
+                  >
+
+                    <div
+                      className="text-[10px] uppercase font-medium truncate"
+                      style={{
+                        color: 'var(--text-tertiary)',
+                      }}
+                    >
+                      Volume Ratio
+                    </div>
+
+                    <div
+                      className="mt-0.5 text-xs font-semibold tabular-nums truncate"
+                      style={{
+                        color: item.volumeRatio && item.volumeRatio >= 2.0 ? 'var(--attention)' : 'var(--text-primary)',
+                        fontFamily: 'var(--font-data)',
+                      }}
+                    >
+                      {item.volumeRatio != null ? `${item.volumeRatio.toFixed(2)}x` : '—'}
+                    </div>
+
+                  </div>
+
+                  {/* Return Z-Score */}
+                  <div
+                    className="rounded-lg p-2.5"
+                    style={{
+                      backgroundColor: 'var(--bg-subtle)',
+                    }}
+                  >
+
+                    <div
+                      className="text-[10px] uppercase font-medium truncate"
+                      style={{
+                        color: 'var(--text-tertiary)',
+                      }}
+                    >
+                      Return Z-Score
+                    </div>
+
+                    <div
+                      className="mt-0.5 text-xs font-semibold tabular-nums truncate"
+                      style={{
+                        color: item.returnZScore && Math.abs(item.returnZScore) >= 2.5 ? 'var(--negative)' : 'var(--text-primary)',
+                        fontFamily: 'var(--font-data)',
+                      }}
+                    >
+                      {item.returnZScore != null ? `${item.returnZScore.toFixed(2)}σ` : '—'}
                     </div>
 
                   </div>

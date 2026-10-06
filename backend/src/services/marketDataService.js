@@ -43,6 +43,9 @@ const YAHOO_SYMBOL_MAP = {
   TATAMOTORS: 'TMCV.NS',
 };
 
+const historyCache = new Map();
+const CACHE_TTL_MS = 15 * 60 * 1000;
+
 
 function cleanSymbol(symbol) {
   return String(symbol || '')
@@ -52,10 +55,20 @@ function cleanSymbol(symbol) {
 
 
 function getYahooSymbol(symbol) {
-  const normalized = cleanSymbol(symbol);
+  const raw = String(symbol || '').trim();
+
+  if (raw.startsWith('^')) {
+    return raw.toUpperCase();
+  }
+
+  const normalized = raw.toUpperCase();
 
   if (!normalized) {
     return '';
+  }
+
+  if (normalized === 'NIFTY50' || normalized === 'NIFTY 50') {
+    return '^NSEI';
   }
 
   /*
@@ -530,7 +543,19 @@ export async function getHistoricalPrices(
   const normalizedSymbol =
     cleanSymbol(symbol);
 
-  return withReliability(async () => {
+  const requestedRange =
+    String(range || '1d').toLowerCase();
+
+  const cacheKey = `${normalizedSymbol}:${requestedRange}`;
+
+  if (normalizedSymbol) {
+    const cached = historyCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return cached.data;
+    }
+  }
+
+  const responseResult = await withReliability(async () => {
     const retrievedAt =
       new Date().toISOString();
 
@@ -542,7 +567,7 @@ export async function getHistoricalPrices(
         retrievedAt,
         marketTimestamp: null,
         yahooSymbol: '',
-        range,
+        range: requestedRange,
         interval: '5m',
         points: [],
       };
@@ -561,32 +586,23 @@ export async function getHistoricalPrices(
      * ========================================================
      * RANGE CONFIGURATION
      * ========================================================
-     *
-     * IMPORTANT:
-     *
-     * For 1D we intentionally request 5 days rather than
-     * 1 day.
-     *
-     * Why?
-     *
-     * If today is Saturday/Sunday, Yahoo's 1d response can
-     * become sparse or represent the current non-trading day.
-     *
-     * Fetching 5d gives us recent trading sessions.
-     *
-     * We then select the latest actual Indian market date.
      */
 
     let yahooRange = '5d';
     let interval = '5m';
 
-    if (range === '1w') {
+    if (requestedRange === '1w') {
       yahooRange = '5d';
       interval = '15m';
-    }
-
-    if (range === '1m') {
+    } else if (requestedRange === '1m') {
       yahooRange = '1mo';
+      interval = '1d';
+    } else if (
+      requestedRange === '90d' ||
+      requestedRange === '3mo' ||
+      requestedRange === '6mo'
+    ) {
+      yahooRange = '6mo';
       interval = '1d';
     }
 
@@ -613,9 +629,21 @@ export async function getHistoricalPrices(
 
 
     if (!response.ok) {
-      throw new Error(
-        `Yahoo Finance returned ${response.status}`
-      );
+      return {
+        symbol: normalizedSymbol,
+        status:
+          response.status === 429
+            ? 'rate_limited'
+            : 'unavailable',
+        source: 'yahoo-finance',
+        retrievedAt,
+        marketTimestamp: null,
+        yahooSymbol,
+        range: requestedRange,
+        interval,
+        points: [],
+        error: `Yahoo Finance returned ${response.status}`,
+      };
     }
 
 
@@ -638,7 +666,7 @@ export async function getHistoricalPrices(
         retrievedAt,
         marketTimestamp: null,
         yahooSymbol,
-        range,
+        range: requestedRange,
         interval,
         points: [],
       };
@@ -697,19 +725,9 @@ export async function getHistoricalPrices(
      * ========================================================
      *
      * Only needed for 1D.
-     *
-     * For example, if the current day is Saturday:
-     *
-     * Yahoo may return:
-     *
-     * Wednesday
-     * Thursday
-     * Friday
-     *
-     * We select Friday.
      */
     const latestTradingDate =
-      range === '1d'
+      requestedRange === '1d'
         ? getLatestTradingDate(
             timestamps
           )
@@ -769,7 +787,7 @@ export async function getHistoricalPrices(
        * For 1D, only keep the latest actual
        * trading date.
        */
-      if (range === '1d') {
+      if (requestedRange === '1d') {
         const indiaDate =
           getIndiaDate(timestamp);
 
@@ -832,10 +850,6 @@ export async function getHistoricalPrices(
      * ========================================================
      * SORT CHRONOLOGICALLY
      * ========================================================
-     *
-     * Oldest -> newest.
-     *
-     * Recharts receives the points in proper X-axis order.
      */
     points.sort(
       (a, b) =>
@@ -876,17 +890,21 @@ export async function getHistoricalPrices(
 
 
     /*
-     * ========================================================
-     * FALLBACK FOR SPARSE 1D DATA
-     * ========================================================
-     *
-     * If Yahoo unexpectedly gives only one point for 1D,
-     * don't manufacture fake prices.
-     *
-     * We simply return the real point(s) we received.
-     *
-     * This keeps MarketPulse truthful.
+     * For 90d / 3mo, return at least the 90 most recent candles
+     * (or all available daily candles if fewer than 90).
      */
+    let finalPoints = uniquePoints;
+
+    if (
+      requestedRange === '90d' ||
+      requestedRange === '3mo'
+    ) {
+      if (uniquePoints.length > 90) {
+        finalPoints = uniquePoints.slice(uniquePoints.length - 90);
+      }
+    }
+
+
     const marketTimestamp =
       Number.isFinite(
         Number(
@@ -898,9 +916,9 @@ export async function getHistoricalPrices(
               result.meta.regularMarketTime
             ) * 1000
           ).toISOString()
-        : uniquePoints.length > 0
-          ? uniquePoints[
-              uniquePoints.length - 1
+        : finalPoints.length > 0
+          ? finalPoints[
+              finalPoints.length - 1
             ].timestamp
           : null;
 
@@ -923,7 +941,7 @@ export async function getHistoricalPrices(
 
 
       status:
-        uniquePoints.length > 0
+        finalPoints.length > 0
           ? 'ok'
           : 'unavailable',
 
@@ -941,20 +959,39 @@ export async function getHistoricalPrices(
       yahooSymbol,
 
 
-      range,
+      range:
+        requestedRange,
 
 
       interval,
 
 
-      /*
-       * StockDetail.tsx uses this array
-       * directly for Recharts.
-       */
       points:
-        uniquePoints,
+        finalPoints,
     };
   });
+
+  if (
+    normalizedSymbol &&
+    responseResult &&
+    (responseResult.status === 'ok' ||
+      (Array.isArray(responseResult.points) &&
+        responseResult.points.length > 0))
+  ) {
+    historyCache.set(cacheKey, {
+      timestamp: Date.now(),
+      data: responseResult,
+    });
+  }
+
+  return responseResult;
+}
+
+
+export async function getBenchmarkHistory(
+  range = '3mo'
+) {
+  return getHistoricalPrices('^NSEI', range);
 }
 
 

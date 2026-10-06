@@ -87,14 +87,24 @@ export function StockRow({
         {/* Stock */}
         <div className="min-w-0">
 
-          <div
-            className="font-medium truncate"
-            style={{
-              color:
-                'var(--text-primary)',
-            }}
-          >
-            {item.symbol}
+          <div className="flex items-center gap-2">
+
+            <div
+              className="font-medium truncate"
+              style={{
+                color:
+                  'var(--text-primary)',
+              }}
+            >
+              {item.symbol}
+            </div>
+
+            {item.isSilentSignal && (
+              <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700/50 rounded px-1.5 py-0.5 text-[10px] font-semibold shrink-0">
+                🤫 Silent Signal
+              </span>
+            )}
+
           </div>
 
           <div
@@ -142,13 +152,13 @@ export function StockRow({
 
         {/* Score */}
         <div
-          className="text-right"
+          className="text-right font-medium"
           style={{
             color:
               'var(--text-primary)',
           }}
         >
-          {item.attentionScore}
+          {item.anomalyScore ?? item.attentionScore}
         </div>
 
 
@@ -238,30 +248,47 @@ export function StockRow({
           >
 
             {/* Heading */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
 
-              <span
-                className="flex items-center justify-center w-6 h-6 rounded-md text-xs font-semibold"
-                style={{
-                  backgroundColor:
-                    'var(--bg-elevated)',
-                  color: accent,
-                  border:
-                    '1px solid var(--border)',
-                }}
-              >
-                ?
-              </span>
+              <div className="flex items-center gap-2">
 
-              <div
-                className="text-xs font-semibold uppercase tracking-wide"
-                style={{
-                  color:
-                    'var(--text-primary)',
-                }}
-              >
-                Why did it change?
+                <span
+                  className="flex items-center justify-center w-6 h-6 rounded-md text-xs font-semibold"
+                  style={{
+                    backgroundColor:
+                      'var(--bg-elevated)',
+                    color: accent,
+                    border:
+                      '1px solid var(--border)',
+                  }}
+                >
+                  ?
+                </span>
+
+                <div
+                  className="text-xs font-semibold uppercase tracking-wide"
+                  style={{
+                    color:
+                      'var(--text-primary)',
+                  }}
+                >
+                  Why did it change?
+                </div>
+
               </div>
+
+              {item.anomalyStatus && (
+                <span
+                  className="text-xs font-medium px-2 py-0.5 rounded border"
+                  style={{
+                    borderColor: 'var(--border)',
+                    color: 'var(--text-secondary)',
+                    backgroundColor: 'var(--bg-elevated)',
+                  }}
+                >
+                  {item.anomalyStatus} (Score: {item.anomalyScore ?? item.attentionScore})
+                </span>
+              )}
 
             </div>
 

@@ -241,6 +241,15 @@ function getTooltipTime(
 }
 
 
+interface BacktestResult {
+  strategyName: string;
+  totalTrades: number;
+  winRate: number;
+  totalReturn: number;
+  maxDrawdown: number;
+  finalPortfolioValue: number;
+}
+
 export function StockDetail({
   item,
   onBack,
@@ -275,6 +284,33 @@ export function StockDetail({
   ] = useState<string | null>(
     null
   );
+
+  const [backtestData, setBacktestData] = useState<BacktestResult | null>(null);
+  const [isLoadingBacktest, setIsLoadingBacktest] = useState(false);
+  const [backtestError, setBacktestError] = useState<string | null>(null);
+
+  const fetchBacktest = async () => {
+    setIsLoadingBacktest(true);
+    setBacktestError(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/backtest/${encodeURIComponent(item.symbol)}`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        throw new Error(`Backtest failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      setBacktestData(data);
+    } catch (err) {
+      setBacktestError(err instanceof Error ? err.message : 'Unable to run strategy backtest.');
+    } finally {
+      setIsLoadingBacktest(false);
+    }
+  };
+
 
 
   /*
@@ -582,6 +618,12 @@ export function StockDetail({
                 >
                   {tierLabel}
                 </span>
+
+                {item.isSilentSignal && (
+                  <span className="bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-300 dark:border-amber-700/50 rounded-full px-3 py-1 text-xs font-semibold shrink-0 inline-flex items-center gap-1">
+                    🤫 Silent Signal Detected
+                  </span>
+                )}
 
               </div>
 
@@ -1105,7 +1147,7 @@ export function StockDetail({
 
 
         {/* =====================================================
-            METRICS
+            METRICS & STATISTICAL ANALYSIS
         ====================================================== */}
 
         <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -1134,6 +1176,268 @@ export function StockDetail({
           />
 
         </div>
+
+        {/* Statistical Metrics Grid */}
+        <section
+          className="mb-6 rounded-xl border p-5 sm:p-6"
+          style={{
+            backgroundColor: 'var(--bg-elevated)',
+            borderColor: 'var(--border)',
+            boxShadow: 'var(--shadow-card)',
+          }}
+        >
+          <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+            <div>
+              <h2
+                className="text-lg font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Statistical Metrics (20-Day Baseline)
+              </h2>
+              <p
+                className="mt-0.5 text-sm"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Rolling mathematical indicators computed against 20-day benchmark history.
+              </p>
+            </div>
+            {item.anomalyStatus && (
+              <span
+                className="text-xs font-semibold px-3 py-1 rounded-md border"
+                style={{
+                  borderColor: 'var(--border)',
+                  color: 'var(--text-primary)',
+                  backgroundColor: 'var(--bg-subtle)',
+                }}
+              >
+                Status: {item.anomalyStatus}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="rounded-lg p-3 border" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border)' }}>
+              <div className="text-xs text-tertiary" style={{ color: 'var(--text-tertiary)' }}>Return Z-Score</div>
+              <div className="mt-1 text-base font-bold tabular-nums" style={{ color: item.returnZScore && Math.abs(item.returnZScore) >= 2.5 ? 'var(--negative)' : 'var(--text-primary)', fontFamily: 'var(--font-data)' }}>
+                {item.returnZScore != null ? `${item.returnZScore.toFixed(2)}σ` : 'N/A'}
+              </div>
+            </div>
+
+            <div className="rounded-lg p-3 border" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border)' }}>
+              <div className="text-xs text-tertiary" style={{ color: 'var(--text-tertiary)' }}>Volume Z-Score</div>
+              <div className="mt-1 text-base font-bold tabular-nums" style={{ color: item.volumeZScore && item.volumeZScore >= 3.0 ? 'var(--negative)' : 'var(--text-primary)', fontFamily: 'var(--font-data)' }}>
+                {item.volumeZScore != null ? `${item.volumeZScore.toFixed(2)}σ` : 'N/A'}
+              </div>
+            </div>
+
+            <div className="rounded-lg p-3 border" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border)' }}>
+              <div className="text-xs text-tertiary" style={{ color: 'var(--text-tertiary)' }}>Volume Ratio</div>
+              <div className="mt-1 text-base font-bold tabular-nums" style={{ color: item.volumeRatio && item.volumeRatio >= 2.0 ? 'var(--attention)' : 'var(--text-primary)', fontFamily: 'var(--font-data)' }}>
+                {item.volumeRatio != null ? `${item.volumeRatio.toFixed(2)}x` : 'N/A'}
+              </div>
+            </div>
+
+            <div className="rounded-lg p-3 border" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border)' }}>
+              <div className="text-xs text-tertiary" style={{ color: 'var(--text-tertiary)' }}>Volatility Z-Score</div>
+              <div className="mt-1 text-base font-bold tabular-nums" style={{ color: item.volatilityZScore && item.volatilityZScore >= 2.5 ? 'var(--negative)' : 'var(--text-primary)', fontFamily: 'var(--font-data)' }}>
+                {item.volatilityZScore != null ? `${item.volatilityZScore.toFixed(2)}σ` : 'N/A'}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Movement Attribution Section (CAPM Beta) */}
+        <section
+          className="mb-6 rounded-xl border p-5 sm:p-6"
+          style={{
+            backgroundColor: 'var(--bg-elevated)',
+            borderColor: 'var(--border)',
+            boxShadow: 'var(--shadow-card)',
+          }}
+        >
+          <div className="mb-4">
+            <h2
+              className="text-lg font-semibold"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Movement Attribution (60-Day Beta)
+            </h2>
+            <p
+              className="mt-0.5 text-sm"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Decomposition of stock return into market-driven (NIFTY 50) vs. stock-specific movement.
+            </p>
+          </div>
+
+          {item.attributionStatus === 'insufficient_data' || item.marketSharePct == null || item.stockSharePct == null ? (
+            <div className="rounded-lg p-4 text-sm border" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border)', color: 'var(--text-tertiary)' }}>
+              Not enough historical data (requires 60 trading days) to calculate market attribution.
+            </div>
+          ) : (
+            <div>
+              {/* Dual Progress Bar */}
+              <div
+                className="w-full h-4 rounded-full overflow-hidden flex"
+                style={{ backgroundColor: 'var(--bg-subtle)' }}
+              >
+                <div
+                  className="h-full transition-all duration-300"
+                  style={{
+                    width: `${Math.max(0, Math.min(100, item.marketSharePct))}%`,
+                    backgroundColor: 'var(--brand, #3b82f6)',
+                  }}
+                  title={`Market-Driven: ${item.marketSharePct}%`}
+                />
+                <div
+                  className="h-full transition-all duration-300"
+                  style={{
+                    width: `${Math.max(0, Math.min(100, item.stockSharePct))}%`,
+                    backgroundColor: 'var(--positive, #10b981)',
+                  }}
+                  title={`Stock-Specific: ${item.stockSharePct}%`}
+                />
+              </div>
+
+              {/* Labels */}
+              <div className="mt-3 flex items-center justify-between text-xs sm:text-sm font-medium">
+                <div className="flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: 'var(--brand, #3b82f6)' }} />
+                  <span>🌍 Market-Driven: <span className="font-bold tabular-nums">{item.marketSharePct}%</span></span>
+                </div>
+
+                <div className="flex items-center gap-1.5" style={{ color: 'var(--text-primary)' }}>
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: 'var(--positive, #10b981)' }} />
+                  <span>🏢 Stock-Specific: <span className="font-bold tabular-nums">{item.stockSharePct}%</span></span>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Strategy Simulation (Backtest) */}
+        <section
+          className="mb-6 rounded-xl border p-5 sm:p-6"
+          style={{
+            backgroundColor: 'var(--bg-elevated)',
+            borderColor: 'var(--border)',
+            boxShadow: 'var(--shadow-card)',
+          }}
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+            <div>
+              <h2
+                className="text-lg font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Strategy Simulation (Backtest)
+              </h2>
+              <p
+                className="mt-0.5 text-sm"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                Historical performance simulation of 5-day holding momentum strategy on anomaly triggers.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={fetchBacktest}
+              disabled={isLoadingBacktest}
+              className="px-4 py-2 text-xs font-semibold rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50 shrink-0 border"
+              style={{
+                backgroundColor: 'var(--brand)',
+                color: '#ffffff',
+                borderColor: 'var(--brand-strong)',
+              }}
+            >
+              {isLoadingBacktest ? 'Running Backtest...' : 'Run Silent Signal 5-Day Hold Backtest'}
+            </button>
+          </div>
+
+          {backtestError && (
+            <div className="p-3 text-xs rounded-lg border text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-300 border-red-200 dark:border-red-900/40">
+              {backtestError}
+            </div>
+          )}
+
+          {backtestData && (
+            <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+              <div className="text-xs font-semibold mb-3 text-tertiary" style={{ color: 'var(--text-tertiary)' }}>
+                STRATEGY PERFORMANCE RESULTS: {backtestData.strategyName}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* Total Trades */}
+                <div className="rounded-lg p-3 border" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border)' }}>
+                  <div className="text-xs text-tertiary" style={{ color: 'var(--text-tertiary)' }}>Total Trades</div>
+                  <div className="mt-1 text-base font-bold tabular-nums" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-data)' }}>
+                    {backtestData.totalTrades}
+                  </div>
+                </div>
+
+                {/* Win Rate */}
+                <div className="rounded-lg p-3 border" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border)' }}>
+                  <div className="text-xs text-tertiary" style={{ color: 'var(--text-tertiary)' }}>Win Rate</div>
+                  <div
+                    className="mt-1 text-base font-bold tabular-nums"
+                    style={{
+                      color: backtestData.winRate >= 50 ? 'var(--positive)' : 'var(--text-primary)',
+                      fontFamily: 'var(--font-data)',
+                    }}
+                  >
+                    {backtestData.winRate}%
+                  </div>
+                </div>
+
+                {/* Total Return */}
+                <div className="rounded-lg p-3 border" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border)' }}>
+                  <div className="text-xs text-tertiary" style={{ color: 'var(--text-tertiary)' }}>Total Return</div>
+                  <div
+                    className="mt-1 text-base font-bold tabular-nums"
+                    style={{
+                      color: backtestData.totalReturn >= 0 ? 'var(--positive)' : 'var(--negative)',
+                      fontFamily: 'var(--font-data)',
+                    }}
+                  >
+                    {backtestData.totalReturn >= 0 ? '+' : ''}{backtestData.totalReturn}%
+                  </div>
+                </div>
+
+                {/* Max Drawdown */}
+                <div className="rounded-lg p-3 border" style={{ backgroundColor: 'var(--bg-subtle)', borderColor: 'var(--border)' }}>
+                  <div className="text-xs text-tertiary" style={{ color: 'var(--text-tertiary)' }}>Max Drawdown</div>
+                  <div
+                    className="mt-1 text-base font-bold tabular-nums"
+                    style={{
+                      color: 'var(--negative)',
+                      fontFamily: 'var(--font-data)',
+                    }}
+                  >
+                    {backtestData.maxDrawdown}%
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Silent Signal Observation Card */}
+        {item.isSilentSignal && (
+          <section className="mb-6 rounded-xl border border-amber-300 dark:border-amber-700/60 bg-amber-50/80 dark:bg-amber-950/40 p-5 sm:p-6 shadow-sm">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl shrink-0">🤫</span>
+              <div>
+                <h3 className="text-base font-bold text-amber-900 dark:text-amber-200">
+                  Silent Signal Observation
+                </h3>
+                <p className="mt-1 text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
+                  MarketPulse observed significantly elevated trading volume ({item.volumeRatio?.toFixed(2)}x baseline) accompanied by minimal price movement (&lt;0.5%). This price-volume divergence indicates potential institutional volume absorption, block trading activity, or baseline market accumulation/distribution, warranting close investigation.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
 
 
         {/* =====================================================

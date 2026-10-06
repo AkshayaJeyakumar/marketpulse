@@ -47,6 +47,22 @@ export interface WatchlistItem {
 
   tier: Tier;
 
+  // Milestone 3 & 4 Anomaly Engine fields
+  anomalyScore?: number;
+  anomalyStatus?: string;
+  volumeRatio?: number | null;
+  returnZScore?: number | null;
+  volumeZScore?: number | null;
+  volatilityZScore?: number | null;
+  isSilentSignal?: boolean;
+  summaryText?: string | null;
+
+  // Milestone 6 CAPM Movement Attribution fields
+  marketSharePct?: number | null;
+  stockSharePct?: number | null;
+  attributionStatus?: string;
+
+
   signals?: {
     priceSignal: number;
     volumeSignal: number;

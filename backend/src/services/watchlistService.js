@@ -10,11 +10,13 @@
  * - Save a snapshot ONLY when the user acknowledges the view
  */
 
-import { getQuote } from './marketDataService.js';
+import { getQuote, getHistoricalPrices, getBenchmarkHistory } from './marketDataService.js';
 import { pool, query } from '../db/database.js';
 import { computeSignals } from './changeDetectionEngine.js';
 import { rankAttention } from './attentionRankingEngine.js';
 import { buildExplanation } from './explanationService.js';
+import { computeStockStatistics } from './statisticalAnalysisService.js';
+import { evaluateAnomalies } from './anomalyDetectionEngine.js';
 import { config } from '../config/index.js';
 
 const WATCHLIST_NAME = 'My Watchlist';
@@ -78,18 +80,23 @@ async function getPreviousSnapshots(userId, symbols) {
 
 
 /**
- * Fetch current market data and calculate changes.
+ * Fetch current market data, calculate statistical metrics, and run anomaly detection.
  *
  * IMPORTANT:
  * This function NEVER writes to the database.
  */
 async function buildCurrentItems(symbols, previousBySymbol) {
+  // Fetch NIFTY 50 benchmark history ONCE per request
+  let benchmarkData = null;
+  try {
+    benchmarkData = await getBenchmarkHistory('3mo');
+  } catch (err) {
+    console.error('Failed to fetch benchmark history for anomaly analysis:', err.message);
+  }
+
   return Promise.all(
     symbols.map(async (symbol) => {
-      const previous =
-        previousBySymbol.get(symbol) || null;
-
-      let current;
+      const previous = previousBySymbol.get(symbol) || null;
 
       try {
         if (config.marketDataProvider !== 'yahoo') {
@@ -98,12 +105,150 @@ async function buildCurrentItems(symbols, previousBySymbol) {
           );
         }
 
-        current = await getQuote(symbol);
+        // Fetch quote and 90-day history per stock
+        const current = await getQuote(symbol);
+
+        if (current.status !== 'ok') {
+          return {
+            symbol,
+            name: current.name || symbol,
+            status: current.status || 'unavailable',
+            freshness: current.freshness || 'unavailable',
+            source: current.source || 'yahoo-finance',
+            retrievedAt: current.retrievedAt,
+            marketTimestamp: current.marketTimestamp,
+            anomalyScore: 0,
+            anomalyStatus: 'Normal Activity',
+            volumeRatio: 1,
+            returnZScore: 0,
+            volumeZScore: 0,
+            volatilityZScore: 0,
+            isSilentSignal: false,
+            summaryText: 'Market data unavailable for anomaly analysis.',
+            tier: 'normal',
+            attentionScore: 0,
+            reasons: ['Market data is currently unavailable for this stock.'],
+            explanation: 'MarketPulse could not calculate a meaningful change because current market data is unavailable.',
+            explanationDisclaimer: 'This is an observation of market activity, not investment advice or a prediction.',
+            lastViewedAt: previous?.viewedAt || null,
+            priceChangeSinceLastView: null,
+            volumeChangeSinceLastView: null,
+          };
+        }
+
+        const stockData = await getHistoricalPrices(symbol, '3mo');
+
+        // Check if both stock historical data and benchmark data are sufficient
+        let anomalyScore = 0;
+        let anomalyStatus = 'Normal Activity';
+        let volumeRatio = 1;
+        let returnZScore = 0;
+        let volumeZScore = 0;
+        let volatilityZScore = 0;
+        let isSilentSignal = false;
+        let summaryText = 'Normal activity consistent with baseline parameters.';
+        let tier = 'normal';
+        let attentionScore = 0;
+        let explanation = {
+          summary: 'Normal activity consistent with baseline parameters.',
+          reasons: ['No unusual activity detected.'],
+          disclaimer: 'This is an observation of market activity, not investment advice or a prediction.',
+        };
+        let metrics = null;
+        let anomalyResult = null;
+
+        if (
+          stockData.status === 'ok' &&
+          benchmarkData?.status === 'ok' &&
+          Array.isArray(stockData.points) &&
+          stockData.points.length >= 20 &&
+          Array.isArray(benchmarkData.points) &&
+          benchmarkData.points.length >= 20
+        ) {
+          metrics = computeStockStatistics(stockData.points, benchmarkData.points);
+          anomalyResult = evaluateAnomalies(metrics);
+
+          const ranking = rankAttention(anomalyResult.anomalyScore);
+          attentionScore = ranking.attentionScore;
+          tier = ranking.tier;
+
+          anomalyScore = anomalyResult.anomalyScore;
+          anomalyStatus = anomalyResult.anomalyStatus;
+          volumeRatio = metrics.volumeRatio;
+          returnZScore = metrics.returnZScore;
+          volumeZScore = metrics.volumeZScore;
+          volatilityZScore = metrics.volatilityZScore;
+          isSilentSignal = anomalyResult.isSilentSignal;
+          summaryText = anomalyResult.summaryText;
+
+          explanation = buildExplanation(summaryText, current, attentionScore);
+        } else {
+          const signals = computeSignals(previous, current);
+          const fallbackRanking = rankAttention(signals);
+          attentionScore = fallbackRanking.attentionScore;
+          tier = fallbackRanking.tier;
+          explanation = buildExplanation(signals, current, attentionScore);
+        }
+
+        const priceChangeSinceLastView =
+          previous && Number.isFinite(previous.price) && previous.price > 0
+            ? ((current.price - previous.price) / previous.price) * 100
+            : null;
+
+        const volumeChangeSinceLastView =
+          previous && Number.isFinite(previous.volume) && previous.volume > 0
+            ? ((current.volume - previous.volume) / previous.volume) * 100
+            : null;
+
+        // Milestone 6 Movement Attribution fields
+        const marketSharePct = metrics?.marketSharePct ?? null;
+        const stockSharePct = metrics?.stockSharePct ?? null;
+        const attributionStatus = metrics?.attributionStatus ?? 'insufficient_data';
+
+        return {
+          symbol,
+          name: current.name,
+          price: current.price,
+          prevClose: current.prevClose,
+
+          priceChangeSinceLastView,
+          volumeChangeSinceLastView,
+
+          lastViewedAt: previous?.viewedAt || null,
+          direction: current.direction,
+          volume: current.volume,
+
+          status: current.status,
+          freshness: current.freshness,
+          source: current.source,
+
+          retrievedAt: current.retrievedAt,
+          marketTimestamp: current.marketTimestamp,
+
+          // Milestone 3 & 4 Anomaly Metrics
+          anomalyScore,
+          anomalyStatus,
+          volumeRatio,
+          returnZScore,
+          volumeZScore,
+          volatilityZScore,
+          isSilentSignal,
+          summaryText,
+
+          // Milestone 6 CAPM Movement Attribution
+          marketSharePct,
+          stockSharePct,
+          attributionStatus,
+
+          attentionScore,
+          tier,
+
+          reasons: explanation.reasons,
+          explanation: explanation.summary,
+          explanationDisclaimer: explanation.disclaimer,
+        };
       } catch (error) {
-        console.error(
-          `Market data failed for ${symbol}:`,
-          error.message
-        );
+        console.error(`Market data failed for ${symbol}:`, error.message);
 
         return {
           symbol,
@@ -113,125 +258,32 @@ async function buildCurrentItems(symbols, previousBySymbol) {
           source: 'yahoo-finance',
           retrievedAt: new Date().toISOString(),
           marketTimestamp: null,
+          anomalyScore: 0,
+          anomalyStatus: 'Normal Activity',
+          volumeRatio: 1,
+          returnZScore: 0,
+          volumeZScore: 0,
+          volatilityZScore: 0,
+          isSilentSignal: false,
+          summaryText: 'Market data unavailable for anomaly analysis.',
+          marketSharePct: null,
+          stockSharePct: null,
+          attributionStatus: 'insufficient_data',
           tier: 'normal',
           attentionScore: 0,
-          reasons: [
-            'Market data could not be retrieved right now.',
-          ],
-          explanation:
-            'MarketPulse could not calculate a meaningful change because the market-data provider is unavailable.',
-          explanationDisclaimer:
-            'This is an observation of market activity, not investment advice or a prediction.',
-          lastViewedAt:
-            previous?.viewedAt || null,
+          reasons: ['Market data could not be retrieved right now.'],
+          explanation: 'MarketPulse could not calculate anomaly metrics because the market-data provider is unavailable.',
+          explanationDisclaimer: 'This is an observation of market activity, not investment advice or a prediction.',
+          lastViewedAt: previous?.viewedAt || null,
           priceChangeSinceLastView: null,
           volumeChangeSinceLastView: null,
         };
       }
 
-      if (current.status !== 'ok') {
-        return {
-          symbol,
-          name: current.name || symbol,
-          status: current.status || 'unavailable',
-          freshness:
-            current.freshness || 'unavailable',
-          source:
-            current.source || 'yahoo-finance',
-          retrievedAt: current.retrievedAt,
-          marketTimestamp: current.marketTimestamp,
-          tier: 'normal',
-          attentionScore: 0,
-          reasons: [
-            'Market data is currently unavailable for this stock.',
-          ],
-          explanation:
-            'MarketPulse could not calculate a meaningful change because current market data is unavailable.',
-          explanationDisclaimer:
-            'This is an observation of market activity, not investment advice or a prediction.',
-          lastViewedAt:
-            previous?.viewedAt || null,
-          priceChangeSinceLastView: null,
-          volumeChangeSinceLastView: null,
-        };
-      }
-
-      const signals = computeSignals(
-        previous,
-        current
-      );
-
-      const {
-        attentionScore,
-        tier,
-      } = rankAttention(signals);
-
-      const explanation =
-        buildExplanation(
-          signals,
-          current,
-          attentionScore
-        );
-
-      const priceChangeSinceLastView =
-        previous &&
-        Number.isFinite(previous.price) &&
-        previous.price > 0
-          ? (
-              (
-                (current.price - previous.price) /
-                previous.price
-              ) * 100
-            )
-          : null;
-
-      const volumeChangeSinceLastView =
-        previous &&
-        Number.isFinite(previous.volume) &&
-        previous.volume > 0
-          ? (
-              (
-                (current.volume - previous.volume) /
-                previous.volume
-              ) * 100
-            )
-          : null;
-
-      return {
-        symbol,
-        name: current.name,
-        price: current.price,
-        prevClose: current.prevClose,
-
-        priceChangeSinceLastView,
-        volumeChangeSinceLastView,
-
-        lastViewedAt:
-          previous?.viewedAt || null,
-
-        direction: current.direction,
-        volume: current.volume,
-
-        status: current.status,
-        freshness: current.freshness,
-        source: current.source,
-
-        retrievedAt: current.retrievedAt,
-        marketTimestamp: current.marketTimestamp,
-
-        attentionScore,
-        tier,
-
-        signals,
-
-        reasons: explanation.reasons,
-        explanation: explanation.summary,
-        explanationDisclaimer:
-          explanation.disclaimer,
-      };
     })
   );
 }
+
 
 
 /**

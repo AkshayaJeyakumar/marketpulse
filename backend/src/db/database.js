@@ -1,19 +1,17 @@
-import pg from 'pg';
-import dotenv from 'dotenv';
+import pkg from "pg";
+import dotenv from "dotenv";
 
 dotenv.config();
 
-const { Pool } = pg;
+const { Pool } = pkg;
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false,
-  },
+  ssl: false, // HARD-CODED FALSE TO GUARANTEE NO SSL
 });
 
-pool.on('error', (error) => {
-  console.error('Unexpected PostgreSQL error:', error);
+pool.on("error", (error) => {
+  console.error("Unexpected PostgreSQL error:", error);
 });
 
 export async function query(text, params) {
@@ -21,9 +19,8 @@ export async function query(text, params) {
 }
 
 export async function checkDatabaseConnection() {
-  const result = await pool.query('SELECT NOW()');
+  const result = await pool.query("SELECT NOW()");
   return result.rows[0];
 }
 
-export { pool };
-export default pool;
+export {pool};

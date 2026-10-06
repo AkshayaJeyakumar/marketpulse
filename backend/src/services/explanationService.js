@@ -121,18 +121,35 @@ export function explainAttention(
 
 /**
  * Returns a structured explanation object for the UI.
+ *
+ * @param {string|object} summaryInput - summaryText from anomaly detection engine or legacy signals
+ * @param {object} [current] - current stock data object
+ * @param {number} [attentionScore] - attention/anomaly score
  */
 export function buildExplanation(
-  signals,
+  summaryInput,
   current,
   attentionScore
 ) {
+  let summaryText = '';
+
+  if (typeof summaryInput === 'string') {
+    summaryText = summaryInput;
+  } else if (summaryInput && typeof summaryInput.summaryText === 'string') {
+    summaryText = summaryInput.summaryText;
+  } else if (summaryInput && typeof summaryInput === 'object') {
+    summaryText = explainAttention(summaryInput, attentionScore);
+  } else {
+    summaryText = 'Observation of market activity reflects normal activity consistent with standard historical parameters.';
+  }
+
+  const reasons = typeof summaryInput === 'string'
+    ? [summaryText]
+    : explainSignals(summaryInput || {}, current);
+
   return {
-    reasons: explainSignals(signals, current),
-    summary: explainAttention(
-      signals,
-      attentionScore
-    ),
+    reasons,
+    summary: summaryText,
     disclaimer:
       'This is an observation of market activity, not investment advice or a prediction.',
   };
