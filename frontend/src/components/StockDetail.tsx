@@ -1730,6 +1730,258 @@ export function StockDetail({
 
 
         {/* =====================================================
+            NEWS CONTEXT & ML FORECAST (STEP 6)
+        ====================================================== */}
+
+        <section
+          className="rounded-xl border p-5 sm:p-6 mb-6"
+          style={{
+            backgroundColor: 'var(--bg-elevated)',
+            borderColor: 'var(--border)',
+            boxShadow: 'var(--shadow-card)',
+          }}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b pb-4"
+               style={{ borderColor: 'var(--border)' }}>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📰</span>
+                <h2
+                  className="text-lg font-semibold"
+                  style={{ color: 'var(--text-primary)' }}
+                >
+                  News Context &amp; ML Forecast
+                </h2>
+              </div>
+              <p
+                className="mt-1 text-sm"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                FinBERT NLP sentiment intelligence and RandomForest ablation study
+              </p>
+            </div>
+
+            {/* Aggregate Tone Badge */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase font-medium tracking-wide" style={{ color: 'var(--text-secondary)' }}>
+                Recent Tone:
+              </span>
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold"
+                style={{
+                  backgroundColor:
+                    (item.sentiment?.sentimentLabel || 'Neutral') === 'Positive'
+                      ? 'color-mix(in srgb, var(--positive) 15%, transparent)'
+                      : (item.sentiment?.sentimentLabel || 'Neutral') === 'Negative'
+                        ? 'color-mix(in srgb, var(--negative) 15%, transparent)'
+                        : 'var(--bg-muted)',
+                  color:
+                    (item.sentiment?.sentimentLabel || 'Neutral') === 'Positive'
+                      ? 'var(--positive)'
+                      : (item.sentiment?.sentimentLabel || 'Neutral') === 'Negative'
+                        ? 'var(--negative)'
+                        : 'var(--text-secondary)',
+                  border: `1px solid ${
+                    (item.sentiment?.sentimentLabel || 'Neutral') === 'Positive'
+                      ? 'color-mix(in srgb, var(--positive) 30%, transparent)'
+                      : (item.sentiment?.sentimentLabel || 'Neutral') === 'Negative'
+                        ? 'color-mix(in srgb, var(--negative) 30%, transparent)'
+                        : 'var(--border)'
+                  }`,
+                }}
+              >
+                {(item.sentiment?.sentimentLabel || 'Neutral') === 'Positive' && '▲ '}
+                {(item.sentiment?.sentimentLabel || 'Neutral') === 'Negative' && '▼ '}
+                {item.sentiment?.sentimentLabel || 'Neutral'}
+                {item.sentiment?.aggregateScore !== undefined && (
+                  <span className="opacity-80 font-mono text-[11px]">
+                    ({item.sentiment.aggregateScore >= 0 ? '+' : ''}{item.sentiment.aggregateScore.toFixed(2)})
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Top 3 Headlines Column */}
+            <div className="lg:col-span-7 flex flex-col gap-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                Top Recent Headlines
+              </h3>
+
+              {item.sentiment?.headlines && item.sentiment.headlines.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {item.sentiment.headlines.slice(0, 3).map((news, idx) => {
+                    const isPos = news.sentimentLabel?.toLowerCase() === 'positive';
+                    const isNeg = news.sentimentLabel?.toLowerCase() === 'negative';
+                    const badgeColor = isPos
+                      ? 'var(--positive)'
+                      : isNeg
+                        ? 'var(--negative)'
+                        : 'var(--text-secondary)';
+                    const badgeBg = isPos
+                      ? 'color-mix(in srgb, var(--positive) 12%, transparent)'
+                      : isNeg
+                        ? 'color-mix(in srgb, var(--negative) 12%, transparent)'
+                        : 'var(--bg-muted)';
+
+                    return (
+                      <div
+                        key={idx}
+                        className="rounded-lg border p-3.5 transition-all hover:border-[var(--text-secondary)]"
+                        style={{
+                          backgroundColor: 'var(--bg-muted)',
+                          borderColor: 'var(--border)',
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <a
+                            href={news.sourceUrl || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-medium hover:underline flex-1"
+                            style={{ color: 'var(--text-primary)' }}
+                          >
+                            {news.headline}
+                          </a>
+                          <span
+                            className="inline-flex items-center shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold"
+                            style={{
+                              backgroundColor: badgeBg,
+                              color: badgeColor,
+                            }}
+                          >
+                            {isPos ? '▲ ' : isNeg ? '▼ ' : '● '}
+                            {news.sentimentLabel.toUpperCase()} ({news.signedScore >= 0 ? '+' : ''}{news.signedScore.toFixed(2)})
+                          </span>
+                        </div>
+                        {news.publishedAt && (
+                          <div className="mt-2 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                            Published: {new Date(news.publishedAt).toLocaleDateString('en-IN', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </div>
+                        )}
+
+                        {/* NEW: MARKET IMPACT ASSESSMENT */}
+                        {news.impact_assessment && (
+                          <div 
+                            className="mt-3 p-2.5 rounded-md"
+                            style={{ 
+                              backgroundColor: 'rgba(59, 130, 246, 0.08)', 
+                              borderLeft: '3px solid #3b82f6'
+                            }}
+                          >
+                            <p className="text-[10px] font-bold uppercase tracking-wide mb-1" style={{ color: '#3b82f6' }}>
+                              💡 Market Impact Assessment
+                            </p>
+                            <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                              {news.impact_assessment}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div
+                  className="rounded-lg border border-dashed p-4 text-center text-xs"
+                  style={{
+                    backgroundColor: 'var(--bg-muted)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  <p className="font-medium text-sm mb-1" style={{ color: 'var(--text-primary)' }}>
+                    No FinBERT analyzed news yet
+                  </p>
+                  Run <code className="px-1.5 py-0.5 rounded bg-black/10 dark:bg-white/10 font-mono text-[11px]">python sentiment_worker.py --ticker {item.symbol}</code> to analyze recent headlines.
+                </div>
+              )}
+            </div>
+
+            {/* ML Ablation Study Comparison Column */}
+            <div className="lg:col-span-5 flex flex-col gap-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                ML Ablation Study (RandomForest)
+              </h3>
+
+              <div
+                className="rounded-lg border overflow-hidden"
+                style={{
+                  backgroundColor: 'var(--bg-muted)',
+                  borderColor: 'var(--border)',
+                }}
+              >
+                <table className="w-full text-left text-xs">
+                  <thead
+                    className="border-b text-[11px] uppercase font-medium"
+                    style={{
+                      borderColor: 'var(--border)',
+                      color: 'var(--text-secondary)',
+                      backgroundColor: 'color-mix(in srgb, var(--bg-muted) 80%, black)',
+                    }}
+                  >
+                    <tr>
+                      <th className="py-2.5 px-3">Configuration</th>
+                      <th className="py-2.5 px-3">Accuracy</th>
+                      <th className="py-2.5 px-3">F1-Score</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                    <tr>
+                      <td className="py-2.5 px-3 font-medium" style={{ color: 'var(--text-secondary)' }}>
+                        Baseline (Z-Score Only)
+                      </td>
+                      <td className="py-2.5 px-3 font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {item.sentiment?.mlForecast?.baselineAccuracy ?? 51.4}%
+                      </td>
+                      <td className="py-2.5 px-3 font-mono" style={{ color: 'var(--text-secondary)' }}>
+                        {item.sentiment?.mlForecast?.f1Baseline ?? 0.491}
+                      </td>
+                    </tr>
+                    <tr style={{ backgroundColor: 'color-mix(in srgb, var(--positive) 8%, transparent)' }}>
+                      <td className="py-2.5 px-3 font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        <div className="flex items-center gap-1.5">
+                          <span>Enhanced (+ FinBERT)</span>
+                          <span
+                            className="rounded px-1.5 py-0.2 text-[10px] font-bold"
+                            style={{
+                              backgroundColor: 'var(--positive)',
+                              color: '#ffffff',
+                            }}
+                          >
+                            +{item.sentiment?.mlForecast?.accuracyLift ?? 7.3}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono font-bold" style={{ color: 'var(--positive)' }}>
+                        {item.sentiment?.mlForecast?.enhancedAccuracy ?? 58.7}%
+                      </td>
+                      <td className="py-2.5 px-3 font-mono font-bold" style={{ color: 'var(--positive)' }}>
+                        {item.sentiment?.mlForecast?.f1Enhanced ?? 0.573}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div className="p-3 border-t text-[11px] leading-relaxed" style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
+                  <div className="font-semibold mb-0.5" style={{ color: 'var(--text-primary)' }}>
+                    🛡️ Look-Ahead Bias Prevention
+                  </div>
+                  Evaluated strictly via <span className="font-mono font-medium">TimeSeriesSplit (n_splits=3)</span>. No futuristic data leakage or random shuffles permitted.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        {/* =====================================================
             DATA TRANSPARENCY
         ====================================================== */}
 

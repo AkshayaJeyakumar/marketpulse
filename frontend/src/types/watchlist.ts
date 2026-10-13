@@ -85,6 +85,35 @@ export interface WatchlistItem {
    * Responsible-use disclaimer.
    */
   explanationDisclaimer?: string;
+
+  // NLP & FinBERT Sentiment Analysis
+  sentiment?: SentimentData;
+}
+
+export interface NewsItem {
+  headline: string;
+  sentimentLabel: 'positive' | 'negative' | 'neutral' | string;
+  signedScore: number;
+  sourceUrl?: string | null;
+  publishedAt?: string;
+  impact_assessment?: string | null;
+}
+
+export interface MLForecastMetrics {
+  baselineAccuracy: number;
+  enhancedAccuracy: number;
+  accuracyLift: number;
+  f1Baseline: number;
+  f1Enhanced: number;
+  model: string;
+}
+
+export interface SentimentData {
+  aggregateScore: number;
+  sentimentLabel: 'Positive' | 'Negative' | 'Neutral' | string;
+  articleCount: number;
+  headlines: NewsItem[];
+  mlForecast?: MLForecastMetrics;
 }
 
 export interface WatchlistView {

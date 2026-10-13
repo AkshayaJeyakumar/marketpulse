@@ -10,7 +10,7 @@ export const config = {
     process.env.DATABASE_URL || null,
 
   marketDataProvider:
-    process.env.MARKET_DATA_PROVIDER || 'demo',
+    process.env.MARKET_DATA_PROVIDER || 'yahoo',
 
   upstox: {
     apiKey:
